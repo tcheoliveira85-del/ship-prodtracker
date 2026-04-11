@@ -1,0 +1,1257 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Ship ProdTracker v3.0 — Portocel</title>
+<meta name="description" content="Produtividade Hora a Hora - Embarque de Celulose">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🚢</text></svg>">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif; -webkit-font-smoothing: antialiased; }
+  input[type="number"]::-webkit-inner-spin-button,
+  input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+  input[type="number"] { -moz-appearance: textfield; }
+  select { -webkit-appearance: none; appearance: none; background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236B7B8D' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e"); background-repeat: no-repeat; background-position: right 4px center; background-size: 12px; padding-right: 18px !important; }
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-thumb { background: #999; border-radius: 4px; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
+<script type="text/babel">
+const { useState, useEffect, useCallback } = React;
+
+
+const VER = "3.0";
+
+async function sGet(k, fb) {
+  try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : fb; } catch { return fb; }
+}
+async function sSet(k, v) {
+  try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { console.error(e); }
+}
+
+const DELAYS = [
+  {c:"AB",d:"Awaiting Berth",r:"SANTOS PORT"},
+  {c:"AC",d:"Awaiting Cargo",r:"PORT OPERATOR"},
+  {c:"AD",d:"Adjusting Cargo",r:"PORT OPERATOR"},
+  {c:"AP",d:"Awaiting Vessel Preparations",r:"OWNER"},
+  {c:"AT",d:"Awaiting Trucks",r:"PORT OPERATOR"},
+  {c:"AW",d:"Awaiting Labours",r:"SHIPPER"},
+  {c:"CA",d:"Awaiting Cargo Arrival at Warehouse",r:"SHIPPER"},
+  {c:"CC",d:"Awaiting Cargo Clearance",r:"SHIPPER"},
+  {c:"CL",d:"Check-list",r:"PORT OPERATOR"},
+  {c:"EF",d:"Spreader Failure (Insert the Cause)",r:"OWNER"},
+  {c:"GD-O",d:"Gang Dismissed (Insert the Cause)",r:"OWNER"},
+  {c:"GD-PO",d:"Gang Dismissed",r:"PORT OPERATOR"},
+  {c:"GD-SH",d:"Gang Dismissed",r:"SHIPPER"},
+  {c:"LA",d:"Final Lashing",r:"PORT OPERATOR"},
+  {c:"LB",d:"Labour Mandatory (Meal Break)",r:"SHIPPER"},
+  {c:"LD-O",d:"Landing/Loading Dunnage",r:"OWNER"},
+  {c:"LD-SH",d:"Landing/Loading Dunnage",r:"SHIPPER"},
+  {c:"LE-O",d:"Handling Rubber Airbags",r:"OWNER"},
+  {c:"LE-SH",d:"Handling Rubber Airbags",r:"SHIPPER"},
+  {c:"NW",d:"No Work Requested as per Shipper's Instructions",r:"SHIPPER"},
+  {c:"OG-O",d:"Working with Only One or Two Gangs (Insert the Cause)",r:"OWNER"},
+  {c:"OG-PO",d:"Working with Only One or Two Gangs (Insert the Cause)",r:"PORT OPERATOR"},
+  {c:"OG-SH",d:"Working with Only One or Two Gangs (Insert the Cause)",r:"SHIPPER"},
+  {c:"OH",d:"Opening / Closing Hatches",r:"OWNER"},
+  {c:"OT-O",d:"Other Vessel (Insert the Cause)",r:"OWNER"},
+  {c:"OT-PO",d:"Other Port Operator (Insert the Cause)",r:"PORT OPERATOR"},
+  {c:"OT-SH",d:"Other Shipper (Insert the Cause)",r:"SHIPPER"},
+  {c:"PA",d:"Preparations Ashore",r:"PORT OPERATOR"},
+  {c:"RA",d:"Rain / Unsettled Weather",r:"WEATHER"},
+  {c:"RE",d:"Connecting / Disconnecting Spreaders",r:"OWNER"},
+  {c:"SA",d:"Strike or Labour Actions",r:"SHIPPER"},
+  {c:"SC",d:"Shifting Cargo (Transit Cargo)",r:"OWNER"},
+  {c:"SG-PO",d:"Shifting Gang",r:"PORT OPERATOR"},
+  {c:"SG-SH",d:"Shifting Gang",r:"SHIPPER"},
+  {c:"SH",d:"Shifting Holds",r:"OWNER"},
+  {c:"SM",d:"Safety Meeting (DDS)",r:"PORT OPERATOR"},
+  {c:"SO",d:"Stowage Changes by Owner (Insert the Cause)",r:"OWNER"},
+  {c:"SP",d:"Stowage Changes by Port Operator (Comments)",r:"PORT OPERATOR"},
+  {c:"SS",d:"Stowage Changes by Shipper (Insert the Cause)",r:"SHIPPER"},
+  {c:"SV",d:"Shifting Vessel Berth",r:"SHIPPER"},
+  {c:"VC",d:"Vessel Crane Failure (Insert the Cause)",r:"OWNER"},
+  {c:"WE",d:"Adverse Weather Conditions (Insert the Cause)",r:"WEATHER"},
+  {c:"WO",d:"Working",r:"WORKING"},
+];
+
+const PERIODOS = ["01x07", "07x13", "13x19", "19x01"];
+const EQUIPES = ["A", "B", "C", "D"];
+const HMAP = {
+  "01x07": [["01","02"],["02","03"],["03","04"],["04","05"],["05","06"],["06","07"]],
+  "07x13": [["07","08"],["08","09"],["09","10"],["10","11"],["11","12"],["12","13"]],
+  "13x19": [["13","14"],["14","15"],["15","16"],["16","17"],["17","18"],["18","19"]],
+  "19x01": [["19","20"],["20","21"],["21","22"],["22","23"],["23","00"],["00","01"]],
+};
+
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+
+/* ── Escala automática ── */
+function getEquipe(dateStr, periodo) {
+  // Reference: 01/01/2026
+  // 07x13/13x19: [C,C,D,D,A,A,B,B] cycle -> pos=floor(days/2)%4 -> [C,D,A,B]
+  // 19x01: [B,B,C,C,D,D,A,A] -> pos=floor(days/2)%4 -> [B,C,D,A]
+  // 01x07: [A,B,B,C,C,D,D,A] -> pos=floor((days-1)/2)%4 -> [B,C,D,A] (shifted 1 day)
+  const ref = new Date(2026, 0, 1);
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const date = new Date(y, m - 1, d);
+  const diffDays = Math.floor((date - ref) / 86400000);
+  const dayTeams = ["C", "D", "A", "B"];
+  const nightTeams = ["B", "C", "D", "A"];
+  if (periodo === "07x13" || periodo === "13x19") {
+    const pos = ((Math.floor(diffDays / 2) % 4) + 4) % 4;
+    return dayTeams[pos];
+  }
+  if (periodo === "19x01") {
+    const pos = ((Math.floor(diffDays / 2) % 4) + 4) % 4;
+    return nightTeams[pos];
+  }
+  // 01x07: shifted by -1 day
+  const pos01 = ((Math.floor((diffDays - 1) / 2) % 4) + 4) % 4;
+  return nightTeams[pos01];
+}
+
+function mkShip() {
+  return {
+    id: uid(), navio: "", viagem: "", berco: "", produto: "Celulose", customProds: [],
+    totalUn: 0, pesoUn: 2, numTernos: 2,
+    ternos: [{ id: uid(), nome: "1º Terno" }, { id: uid(), nome: "2º Terno" }],
+    poroes: [], periodos: [], createdAt: new Date().toISOString(),
+  };
+}
+
+function mkLinhas(per, ternos) {
+  return (HMAP[per] || []).map(([a, b]) => ({
+    id: uid(), h1: a, h2: b,
+    td: ternos.map(t => ({ tid: t.id, un: 0, ca: 0, porId: null, extra: [] })),
+    pars: [],
+  }));
+}
+
+const TH = {
+  light: {
+    bg:"#F0F2F5",card:"#FFF",cAlt:"#F7F9FB",tx:"#1A2332",mut:"#6B7B8D",
+    acc:"#003DA5",accL:"#E8EFF8",ok:"#00A86B",warn:"#E8A317",bad:"#D64045",
+    brd:"#DDE3EA",hBg:"#003DA5",hTx:"#FFF",
+    t1:"#2E6BA6",t2:"#3D7A8A",t3:"#5B8C5A",
+    cy:"#00B8D4",li:"#7CB342",pBg:"#E0E7EF",
+    iBg:"#FFF",iBrd:"#C5CDD8",sh:"0 2px 12px rgba(0,0,0,.08)",
+  },
+  dark: {
+    bg:"#0D1B2A",card:"#1B2838",cAlt:"#162230",tx:"#E4ECF4",mut:"#7B8FA3",
+    acc:"#00B8D4",accL:"#0D2E3A",ok:"#4ADE80",warn:"#FACC15",bad:"#F87171",
+    brd:"#263545",hBg:"#132337",hTx:"#E4ECF4",
+    t1:"#4A9BD9",t2:"#4DB6AC",t3:"#81C784",
+    cy:"#00E5FF",li:"#B2FF59",pBg:"#1E3347",
+    iBg:"#132337",iBrd:"#2C4157",sh:"0 2px 16px rgba(0,0,0,.3)",
+  },
+};
+
+function App() {
+  const [tm, setTm] = useState("light");
+  const [ship, setShip] = useState(null);
+  const [hist, setHist] = useState([]);
+  const [vw, setVw] = useState("home");
+  const [hDet, setHDet] = useState(null);
+  const [toast, setToast] = useState("");
+  const [load, setLoad] = useState(true);
+  const [showChart, setShowChart] = useState(false);
+  const [showBalance, setShowBalance] = useState(false);
+  const [collPers, setCollPers] = useState({}); // {pi: true} for collapsed periods
+  const [confirmDel, setConfirmDel] = useState(null); // pi to confirm delete
+  const [confirmFin, setConfirmFin] = useState(false);
+  const [showNewProd, setShowNewProd] = useState(false);
+  const [newProd, setNewProd] = useState("");
+  const [showPeso, setShowPeso] = useState(false);
+  // delay modal
+  const [dm, setDm] = useState(null);
+  const [dmC, setDmC] = useState("SM");
+  const [dmD, setDmD] = useState("Safety Meeting (DDS)");
+  const [dmT, setDmT] = useState("Geral");
+  const [dmI, setDmI] = useState("");
+  const [dmF, setDmF] = useState("");
+  const [dmM, setDmM] = useState(0);
+  // guincheiro modal
+  const [gm, setGm] = useState(null); // {pi} or null
+  const [gv, setGv] = useState({});
+  const [copyText, setCopyText] = useState(null); // text to show in copy modal
+
+  const t = TH[tm];
+  const tc = i => [t.t1, t.t2, t.t3][i % 3];
+
+  useEffect(() => {
+    (async () => {
+      setTm(await sGet("sp3-tm", "light"));
+      const sh = await sGet("sp3-ship", null);
+      if (sh) setShip(sh);
+      setHist(await sGet("sp3-hist", []));
+      setLoad(false);
+    })();
+  }, []);
+
+  const sv = useCallback(async (s) => { setShip(s); await sSet("sp3-ship", s); }, []);
+  const svH = useCallback(async (h) => { setHist(h); await sSet("sp3-hist", h); }, []);
+  const togTm = async () => { const n = tm === "light" ? "dark" : "light"; setTm(n); await sSet("sp3-tm", n); };
+  const fl = m => { setToast(m); setTimeout(() => setToast(""), 2500); };
+
+  // ── Calc ──
+  function calc(s) {
+    if (!s) return { emb: 0, eTon: 0, ca: 0, saldo: 0, sTon: 0, pct: 0, mH: 0, hOp: 0, etc: null, pLiq: 0, plan: 0 };
+    let emb = 0, ca = 0, hOp = 0;
+    const pw = s.pesoUn || 2;
+    s.periodos.forEach(p => p.linhas.forEach(l => {
+      let lu = 0;
+      l.td.forEach(x => {
+        lu += (x.un || 0); ca += (x.ca || 0);
+        if (x.extra) x.extra.forEach(e => { lu += (e.un || 0); ca += (e.ca || 0); });
+      });
+      emb += lu;
+      if (lu > 0) hOp++;
+    }));
+    const eTon = emb * pw, plan = (s.totalUn || 0) * pw;
+    const saldo = (s.totalUn || 0) - emb, sTon = saldo * pw;
+    const pct = s.totalUn > 0 ? (emb / s.totalUn) * 100 : 0;
+    const mH = hOp > 0 ? emb / hOp : 0, pLiq = hOp > 0 ? eTon / hOp : 0;
+    let etc = null;
+    if (mH > 0 && saldo > 0) etc = new Date(Date.now() + (saldo / mH) * 3600000);
+    return { emb, eTon, ca, saldo, sTon, pct, mH, hOp, etc, pLiq, plan };
+  }
+
+  function tTot(s, tid) {
+    let u = 0, a = 0;
+    s.periodos.forEach(p => p.linhas.forEach(l => {
+      const x = l.td.find(z => z.tid === tid);
+      if (x) {
+        u += (x.un || 0); a += (x.ca || 0);
+        if (x.extra) x.extra.forEach(e => { u += (e.un || 0); a += (e.ca || 0); });
+      }
+    }));
+    return { u, ton: u * (s.pesoUn || 2), a };
+  }
+
+  function hTot(l, pw) {
+    let u = 0, a = 0;
+    l.td.forEach(x => {
+      u += (x.un || 0); a += (x.ca || 0);
+      if (x.extra) x.extra.forEach(e => { u += (e.un || 0); a += (e.ca || 0); });
+    });
+    return { u, ton: u * pw, a };
+  }
+
+  function pTot(per, tid, pw) {
+    let u = 0, a = 0;
+    per.linhas.forEach(l => {
+      const x = l.td.find(z => z.tid === tid);
+      if (x) {
+        u += (x.un || 0); a += (x.ca || 0);
+        if (x.extra) x.extra.forEach(e => { u += (e.un || 0); a += (e.ca || 0); });
+      }
+    });
+    return { u, ton: u * pw, a };
+  }
+
+  function porPerf(s) {
+    if (!s || !s.poroes || !s.poroes.length) return [];
+    const pw = s.pesoUn || 2;
+    return s.poroes.map(po => {
+      let tot = 0, hrs = new Set();
+      s.periodos.forEach(p => p.linhas.forEach((l, li) => {
+        l.td.forEach(x => {
+          if (x.porId === po.id && (x.un || 0) > 0) { tot += (x.un || 0); hrs.add(p.id + "-" + li); }
+          if (x.extra) x.extra.forEach(e => {
+            if (e.porId === po.id && (e.un || 0) > 0) { tot += (e.un || 0); hrs.add(p.id + "-" + li); }
+          });
+        });
+      }));
+      const h = hrs.size || 0;
+      return { id: po.id, nome: po.nome, tot, ton: tot * pw, mH: h > 0 ? tot / h : 0, tH: h > 0 ? (tot * pw) / h : 0 };
+    });
+  }
+
+  // ── WhatsApp ──
+  function genTx(s) {
+    const c = calc(s), pw = s.pesoUn || 2;
+    let tx = `🚢 *${s.navio}* — Viagem ${s.viagem}\n📦 ${s.produto}\n📐 Planejado: ${c.plan.toLocaleString("pt-BR")} mt\n\n`;
+    s.periodos.forEach(p => {
+      tx += `📅 ${p.data} | ${p.periodo} | Eq. ${p.equipe}\n`;
+      if (p.guincheiros) {
+        const gs = Object.entries(p.guincheiros).filter(([, v]) => v);
+        if (gs.length) tx += `👷 ${gs.map(([k, v]) => { const tn = s.ternos.find(x => x.id === k); return (tn?.nome || "") + ": " + v; }).join(" | ")}\n`;
+      }
+      tx += `───────────\n`;
+      p.linhas.forEach(l => {
+        const ht = hTot(l, pw);
+        if (ht.u > 0) {
+          tx += `${l.h1}x${l.h2} → `;
+          l.td.forEach((td, i) => {
+            const allUn = (td.un || 0) + ((td.extra || []).reduce((s, e) => s + (e.un || 0), 0));
+            const allCa = (td.ca || 0) + ((td.extra || []).reduce((s, e) => s + (e.ca || 0), 0));
+            if (allUn > 0) {
+              const po = s.poroes.find(x => x.id === td.porId);
+              tx += `${s.ternos[i]?.nome}${po ? "[" + po.nome + "]" : ""}: ${allUn}un/${allUn * pw}mt/${allCa}ca  `;
+            }
+          });
+          tx += `| ${ht.u}un/${ht.ton}mt/${ht.a}ca\n`;
+        }
+        if (l.pars && l.pars.length) l.pars.forEach(par => {
+          tx += `  ⚠️ ${par.cod}(${par.terno}): ${par.desc} ${par.ini}→${par.fim} ${par.min}min\n`;
+        });
+      });
+      tx += "\n";
+    });
+    tx += `═══════════\n📊 *RESUMO*\n📐 Planejado: ${c.plan.toLocaleString("pt-BR")} mt\n✅ Embarcado: ${c.emb.toLocaleString("pt-BR")} un / ${c.eTon.toLocaleString("pt-BR")} mt\n📦 Saldo: ${c.sTon.toLocaleString("pt-BR")} mt\n🚛 Autos: ${c.ca}\n📈 ${c.pct.toFixed(1)}%\n⚡ ${c.mH.toFixed(1)} un/h | ${c.pLiq.toFixed(1)} mt/h\n`;
+    if (c.etc) tx += `🕐 ETC: ${c.etc.toLocaleDateString("pt-BR")} ${c.etc.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}\n`;
+    tx += `\n_Ship ProdTracker v${VER} · Portocel_`;
+    return tx;
+  }
+
+  function share() {
+    const tx = genTx(ship);
+    if (navigator.share) navigator.share({ text: tx }).catch(() => { });
+    else navigator.clipboard.writeText(tx).then(() => fl("Copiado!")).catch(() => { });
+  }
+
+  // ── Relatório Cliente (6h) ──
+  function genClient() {
+    if (!ship || !ship.periodos || !ship.periodos.length) { fl("Nenhum período registrado"); return; }
+    try {
+      const s = ship;
+      const pw = s.pesoUn || 2;
+      const c = calc(s);
+      const per = s.periodos[s.periodos.length - 1];
+      const [y, m, d] = (per.data || "").split("-");
+      const dataFmt = d && m && y ? `${d}/${m}/${y}` : "—";
+      let tx = `*M/V ${s.navio} Voy.${s.viagem}*\n`;
+      tx += `Berço: ${s.berco || "32"}\n\n`;
+      tx += `*Data/Período: ${dataFmt} – ${per.periodo}*\n`;
+      s.ternos.forEach((tn, ti) => {
+        const pt = pTot(per, tn.id, pw);
+        const porIds = new Set();
+        (per.linhas || []).forEach(l => {
+          const td = (l.td || [])[ti];
+          if (td && td.porId && (td.un || 0) > 0) porIds.add(td.porId);
+          if (td && td.extra) td.extra.forEach(e => { if (e && e.porId && (e.un || 0) > 0) porIds.add(e.porId); });
+        });
+        const porLabels = [...porIds].map(pid => {
+          const po = s.poroes.find(p => p.id === pid);
+          return po ? po.nome.replace("Porão #", "") : "?";
+        });
+        const porLabel = porLabels.length > 0 ? porLabels.join("/") : "—";
+        tx += `${tn.nome} (#${porLabel}) - ${pt.ton.toLocaleString("pt-BR")} mt\n`;
+      });
+      let perUn = 0;
+      (per.linhas || []).forEach(l => { (l.td || []).forEach(x => { perUn += (x.un || 0); if (x.extra) x.extra.forEach(e => perUn += (e ? e.un || 0 : 0)); }); });
+      const perTon = perUn * pw;
+      tx += `\n*Total do período:  ${perTon.toLocaleString("pt-BR")} mt*\n`;
+      tx += `Total  embarcado: ${c.eTon.toLocaleString("pt-BR")} mt (breakdown ${c.plan.toLocaleString("pt-BR")} mt)\n`;
+      tx += `Saldo: ${c.sTon.toLocaleString("pt-BR")} mt\n\n`;
+      if (c.etc) {
+        const etcD = c.etc.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "2-digit" });
+        const etcH = c.etc.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+        tx += `ETC: ${etcD} - ${etcH} AGW WP`;
+      }
+      setCopyText(tx);
+    } catch (err) {
+      console.error(err);
+      fl("Erro: " + (err.message || "falha ao gerar"));
+    }
+  }
+
+  // ── Actions ──
+  function setNT(n) {
+    const s = JSON.parse(JSON.stringify(ship));
+    s.numTernos = n;
+    while (s.ternos.length < n) s.ternos.push({ id: uid(), nome: s.ternos.length + 1 + "º Terno" });
+    while (s.ternos.length > n) s.ternos.pop();
+    s.periodos.forEach(p => p.linhas.forEach(l => {
+      while (l.td.length < n) l.td.push({ tid: s.ternos[l.td.length]?.id, un: 0, ca: 0, porId: null, extra: [] });
+      while (l.td.length > n) l.td.pop();
+      l.td.forEach((x, i) => x.tid = s.ternos[i]?.id);
+    }));
+    sv(s);
+  }
+
+  function addPor() {
+    const s = JSON.parse(JSON.stringify(ship));
+    const num = s.poroes.length + 1;
+    s.poroes.push({ id: uid(), nome: "Porão #" + num, un: 0 });
+    sv(s);
+  }
+
+  function addPer() {
+    const s = JSON.parse(JSON.stringify(ship));
+    const d = new Date().toISOString().slice(0, 10);
+    const nx = s.periodos.length > 0 ? PERIODOS[(PERIODOS.indexOf(s.periodos[s.periodos.length - 1].periodo) + 1) % 4] : PERIODOS[0];
+    const eq = getEquipe(d, nx);
+    s.periodos.push({ id: uid(), data: d, periodo: nx, equipe: eq, guincheiros: {}, linhas: mkLinhas(nx, s.ternos) });
+    sv(s);
+  }
+
+  function updCell(pi, li, ti, f, v) {
+    const s = JSON.parse(JSON.stringify(ship));
+    s.periodos[pi].linhas[li].td[ti][f] = f === "porId" ? (v || null) : (parseInt(v) || 0);
+    sv(s);
+  }
+
+  function addExtra(pi, li, ti) {
+    const s = JSON.parse(JSON.stringify(ship));
+    const td = s.periodos[pi].linhas[li].td[ti];
+    if (!td.extra) td.extra = [];
+    if (td.extra.length >= 2) return;
+    td.extra.push({ porId: null, un: 0, ca: 0 });
+    sv(s);
+  }
+
+  function updExtra(pi, li, ti, ei, f, v) {
+    const s = JSON.parse(JSON.stringify(ship));
+    s.periodos[pi].linhas[li].td[ti].extra[ei][f] = f === "porId" ? (v || null) : (parseInt(v) || 0);
+    sv(s);
+  }
+
+  function rmExtra(pi, li, ti, ei) {
+    const s = JSON.parse(JSON.stringify(ship));
+    s.periodos[pi].linhas[li].td[ti].extra.splice(ei, 1);
+    sv(s);
+  }
+
+  function openDm(pi, li) {
+    setDmC("SM"); setDmD("Safety Meeting (DDS)"); setDmT("Geral");
+    setDmI(""); setDmF(""); setDmM(0); setDm({ pi, li });
+  }
+
+  function saveDm() {
+    if (!dm) return;
+    const s = JSON.parse(JSON.stringify(ship));
+    s.periodos[dm.pi].linhas[dm.li].pars.push({ id: uid(), cod: dmC, desc: dmD, terno: dmT, ini: dmI, fim: dmF, min: dmM });
+    sv(s); setDm(null); fl("Registrado");
+  }
+
+  function rmPar(pi, li, pid) {
+    const s = JSON.parse(JSON.stringify(ship));
+    s.periodos[pi].linhas[li].pars = s.periodos[pi].linhas[li].pars.filter(p => p.id !== pid);
+    sv(s);
+  }
+
+  function openGm(pi) {
+    if (!ship) return;
+    const v = {};
+    ship.ternos.forEach(tn => v[tn.id] = ship.periodos[pi]?.guincheiros?.[tn.id] || "");
+    setGv(v); setGm({ pi });
+  }
+
+  function saveGm() {
+    if (!gm) return;
+    const s = JSON.parse(JSON.stringify(ship));
+    s.periodos[gm.pi].guincheiros = { ...gv };
+    sv(s); setGm(null); fl("Salvo!");
+  }
+
+  function finalizar() {
+    if (!ship) return;
+    svH([{ ...ship, finAt: new Date().toISOString(), res: calc(ship) }, ...hist]);
+    setShip(null); sSet("sp3-ship", null); setVw("home"); fl("Finalizado!");
+  }
+
+  function dmCalc() {
+    if (dmI && dmF) {
+      const [h1, m1] = dmI.split(":").map(Number);
+      const [h2, m2] = dmF.split(":").map(Number);
+      let d = (h2 * 60 + m2) - (h1 * 60 + m1);
+      if (d < 0) d += 1440;
+      setDmM(d);
+    }
+  }
+
+  // ── Styles ──
+  const S = {
+    page: { minHeight: "100vh", background: t.bg, color: t.tx, fontFamily: "'Segoe UI',-apple-system,sans-serif", fontSize: 13 },
+    hdr: { background: t.hBg, color: t.hTx, padding: "12px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", position: "sticky", top: 0, zIndex: 100, boxShadow: "0 2px 8px rgba(0,0,0,.15)" },
+    cnt: { maxWidth: 960, margin: "0 auto", padding: "12px 10px 90px" },
+    crd: { background: t.card, borderRadius: 12, padding: 16, marginBottom: 12, border: `1px solid ${t.brd}`, boxShadow: t.sh },
+    lbl: { fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, color: t.mut, marginBottom: 4, display: "block" },
+    inp: { width: "100%", padding: "8px 10px", borderRadius: 8, border: `1px solid ${t.iBrd}`, background: t.iBg, color: t.tx, fontSize: 13, boxSizing: "border-box", outline: "none" },
+    inpS: { padding: "6px 8px", borderRadius: 6, border: `1px solid ${t.iBrd}`, background: t.iBg, color: t.tx, fontSize: 12, boxSizing: "border-box", outline: "none", textAlign: "center" },
+    sel: { width: "100%", padding: "8px 10px", borderRadius: 8, border: `1px solid ${t.iBrd}`, background: t.iBg, color: t.tx, fontSize: 13, boxSizing: "border-box" },
+    btn: (bg, c) => ({ background: bg, color: c, border: "none", borderRadius: 8, padding: "10px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }),
+    btnS: (bg, c) => ({ background: bg, color: c, border: "none", borderRadius: 6, padding: "6px 12px", fontSize: 11, fontWeight: 600, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4 }),
+    g2: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 },
+    g3: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 },
+    g4: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 8 },
+    stV: { fontSize: 20, fontWeight: 800, color: t.acc },
+    stL: { fontSize: 9, fontWeight: 700, textTransform: "uppercase", color: t.mut, letterSpacing: .8, marginTop: 2 },
+    pBar: { height: 8, borderRadius: 4, background: t.pBg, overflow: "hidden", marginTop: 6 },
+    pFill: p => ({ height: "100%", borderRadius: 4, width: `${Math.min(p, 100)}%`, background: `linear-gradient(90deg,${t.cy},${t.li})`, transition: "width .5s" }),
+    modal: { position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 200, padding: 16 },
+    modalC: { background: t.card, borderRadius: 16, padding: 20, maxWidth: 420, width: "100%", maxHeight: "80vh", overflowY: "auto" },
+    toastS: sh => ({ position: "fixed", bottom: sh ? 24 : -60, left: "50%", transform: "translateX(-50%)", background: t.acc, color: "#FFF", padding: "10px 24px", borderRadius: 24, fontSize: 13, fontWeight: 600, transition: "bottom .3s", zIndex: 300 }),
+    chk: a => ({ width: 20, height: 20, borderRadius: 4, border: `2px solid ${a ? t.acc : t.iBrd}`, background: a ? t.acc : "transparent", display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }),
+    badge: { background: t.accL, color: t.acc, borderRadius: 20, padding: "2px 10px", fontSize: 10, fontWeight: 700 },
+  };
+
+  // ══════ HOME ══════
+  function rHome() {
+    return (
+      <div style={S.cnt}>
+        <div style={{ textAlign: "center", padding: "30px 0 20px" }}>
+          <div style={{ fontSize: 40 }}>🚢</div>
+          <div style={{ fontSize: 20, fontWeight: 800, marginTop: 8 }}>Ship ProdTracker</div>
+          <div style={{ fontSize: 12, color: t.mut, marginTop: 4 }}>Produtividade Hora a Hora — Embarque</div>
+        </div>
+        {ship && (
+          <div style={{ ...S.crd, border: `2px solid ${t.acc}`, cursor: "pointer" }} onClick={() => setVw("active")}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: 15 }}>🚢 {ship.navio || "Sem nome"}</div>
+                <div style={{ fontSize: 11, color: t.mut }}>V.{ship.viagem} · {ship.produto}</div>
+              </div>
+              <span style={S.badge}>Ativo</span>
+            </div>
+            {(() => { const c = calc(ship); const pw = ship.pesoUn || 2; return (
+              <div style={{ marginTop: 10 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: t.mut }}>
+                  <span>{c.emb.toLocaleString("pt-BR")}/{(ship.totalUn || 0).toLocaleString("pt-BR")} un · {c.eTon.toLocaleString("pt-BR")}/{((ship.totalUn || 0) * pw).toLocaleString("pt-BR")} mt</span>
+                  <span style={{ fontWeight: 700, color: t.acc }}>{c.pct.toFixed(1)}%</span>
+                </div>
+                <div style={S.pBar}><div style={S.pFill(c.pct)} /></div>
+              </div>
+            ); })()}
+          </div>
+        )}
+        <button style={{ ...S.btn(t.acc, "#FFF"), width: "100%", justifyContent: "center", marginBottom: 10 }}
+          onClick={() => { if (ship) setVw("active"); else { setShip(mkShip()); setVw("new"); } }}>
+          {ship ? "📋 Continuar" : "＋ Nova Operação"}
+        </button>
+        <button style={{ ...S.btn(t.card, t.tx), width: "100%", justifyContent: "center", border: `1px solid ${t.brd}` }}
+          onClick={() => setVw("history")}>📁 Histórico ({hist.length})</button>
+      </div>
+    );
+  }
+
+  // ══════ NEW ══════
+  function rNew() {
+    if (!ship) return null;
+    const pw = ship.pesoUn || 2;
+    const totalTon = (ship.totalUn || 0) * pw;
+    const prods = ["Celulose", ...(ship.customProds || [])];
+    return (
+      <div style={S.cnt}>
+        <div style={S.crd}>
+          <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 14 }}>🚢 Dados do Navio</div>
+          <div style={S.g3}>
+            <div><label style={S.lbl}>Nome do Navio</label><input value={ship.navio} onChange={e => sv({ ...ship, navio: e.target.value.toUpperCase() })} placeholder="GREEN SALVADOR" style={S.inp} /></div>
+            <div><label style={S.lbl}>Viagem</label><input value={ship.viagem} onChange={e => sv({ ...ship, viagem: e.target.value })} placeholder="9" style={S.inp} /></div>
+            <div><label style={S.lbl}>Berço</label><input value={ship.berco || ""} onChange={e => sv({ ...ship, berco: e.target.value })} placeholder="32" style={S.inp} /></div>
+          </div>
+          <div style={{ ...S.g3, marginTop: 10 }}>
+            <div>
+              <label style={S.lbl}>Produto</label>
+              <select value={ship.produto} onChange={e => { if (e.target.value === "__new") setShowNewProd(true); else sv({ ...ship, produto: e.target.value }); }} style={S.sel}>
+                {prods.map(p => <option key={p} value={p}>{p}</option>)}
+                <option value="__new">＋ Novo...</option>
+              </select>
+              {showNewProd && (
+                <div style={{ display: "flex", gap: 4, marginTop: 4 }}>
+                  <input value={newProd} onChange={e => setNewProd(e.target.value)} placeholder="Novo produto" style={{ ...S.inp, flex: 1 }} />
+                  <button style={S.btnS(t.acc, "#FFF")} onClick={() => { if (newProd.trim()) { sv({ ...ship, customProds: [...(ship.customProds || []), newProd.trim()], produto: newProd.trim() }); setNewProd(""); setShowNewProd(false); } }}>OK</button>
+                </div>
+              )}
+            </div>
+            <div><label style={S.lbl}>Total Unidades</label><input type="number" value={ship.totalUn || ""} onChange={e => sv({ ...ship, totalUn: parseInt(e.target.value) || 0 })} placeholder="15000" style={S.inp} /></div>
+            <div>
+              <label style={S.lbl}>Total (t)</label>
+              <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                <div style={{ ...S.inp, background: t.cAlt, fontWeight: 700, textAlign: "center", padding: "8px 6px" }}>
+                  {totalTon.toLocaleString("pt-BR")} mt
+                </div>
+                <button onClick={() => setShowPeso(!showPeso)} style={{ background: "none", border: `1px solid ${t.iBrd}`, borderRadius: 6, padding: "6px 8px", cursor: "pointer", fontSize: 11, color: t.mut }} title="Configurar peso/un">⚙️</button>
+              </div>
+              {showPeso && (
+                <div style={{ marginTop: 4, padding: "6px 8px", background: t.cAlt, borderRadius: 6, fontSize: 11 }}>
+                  <label style={{ ...S.lbl, fontSize: 9 }}>Peso por unidade (t)</label>
+                  <input type="number" step="0.1" value={ship.pesoUn || ""} onChange={e => sv({ ...ship, pesoUn: parseFloat(e.target.value) || 2 })} style={{ ...S.inpS, width: "100%" }} />
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Ternos */}
+        <div style={S.crd}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12, flexWrap: "wrap" }}>
+            <span style={{ fontSize: 14, fontWeight: 700 }}>⚓ Ternos</span>
+            {[1, 2, 3].map(n => (
+              <label key={n} style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontSize: 12 }}>
+                <div style={S.chk(ship.numTernos === n)} onClick={() => setNT(n)}>
+                  {ship.numTernos === n && <span style={{ color: "#FFF", fontSize: 11, fontWeight: 700 }}>✓</span>}
+                </div>
+                {n} terno{n > 1 ? "s" : ""}
+              </label>
+            ))}
+          </div>
+          {ship.ternos.map((tn, i) => (
+            <div key={tn.id} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, padding: "8px 12px", background: t.cAlt, borderRadius: 8, borderLeft: `4px solid ${tc(i)}` }}>
+              <span style={{ fontWeight: 700, flex: 1 }}>{tn.nome}</span>
+            </div>
+          ))}
+        </div>
+
+        {/* Porões */}
+        <div style={S.crd}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+            <span style={{ fontSize: 14, fontWeight: 700 }}>📦 Divisão por Porão</span>
+            <button style={S.btnS(t.acc, "#FFF")} onClick={addPor}>＋ Porão</button>
+          </div>
+          {ship.poroes && ship.poroes.length > 0 && (
+            <div style={{ overflowX: "auto" }}>
+              {/* Two-block header */}
+              <div style={{ display: "flex", minWidth: "fit-content", marginBottom: 4 }}>
+                {/* Left block header */}
+                <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
+                  <span style={{ width: 90, fontSize: 9, fontWeight: 700, color: t.mut }}>PORÃO</span>
+                  <span style={{ width: 55, fontSize: 9, fontWeight: 700, color: t.mut, textAlign: "center" }}>TOTAL</span>
+                  <span style={{ width: 50, fontSize: 9, fontWeight: 700, color: t.mut, textAlign: "center" }}>MT</span>
+                </div>
+                {/* Spacer for divider */}
+                <div style={{ width: 32, flexShrink: 0 }} />
+                {/* Right block header - Balance title + sub-headers */}
+                <div style={{ flexShrink: 0 }}>
+                  <div style={{ textAlign: "center", fontSize: 11, fontWeight: 700, color: t.acc, marginBottom: 4 }}>⚖️ Balance</div>
+                  <div style={{ display: "flex", gap: 16 }}>
+                    {ship.ternos.map((tn, ti) => (
+                      <div key={tn.id} style={{ display: "flex", gap: 4, flexShrink: 0 }}>
+                        <span style={{ width: 55, fontSize: 9, fontWeight: 700, color: tc(ti), textAlign: "center" }}>{tn.nome.replace("º Terno", "ºT")}</span>
+                        <span style={{ width: 50, fontSize: 9, fontWeight: 700, color: t.mut, textAlign: "center" }}>TOTAL</span>
+                      </div>
+                    ))}
+                    <span style={{ width: 20, flexShrink: 0 }} />
+                  </div>
+                </div>
+              </div>
+              {/* Rows */}
+              {ship.poroes.map((po, i) => (
+                <div key={po.id} style={{ display: "flex", alignItems: "center", marginBottom: 6, minWidth: "fit-content" }}>
+                  {/* Left block */}
+                  <div style={{ display: "flex", alignItems: "center", gap: 4, padding: "6px 6px", background: t.cAlt, borderRadius: 8, flexShrink: 0 }}>
+                    <select value={po.nome} onChange={e => { const s = JSON.parse(JSON.stringify(ship)); s.poroes[i].nome = e.target.value; sv(s); }} style={{ ...S.sel, width: 90, flexShrink: 0, fontSize: 12, padding: "6px 4px" }}>
+                      {Array.from({ length: 10 }, (_, j) => j + 1).map(n => (
+                        <option key={n} value={"Porão #" + n}>Porão #{n}</option>
+                      ))}
+                    </select>
+                    <input type="number" value={po.un || ""} onChange={e => { const s = JSON.parse(JSON.stringify(ship)); s.poroes[i].un = parseInt(e.target.value) || 0; sv(s); }} placeholder="Un" style={{ ...S.inpS, width: 55, flexShrink: 0 }} />
+                    <div style={{ ...S.inpS, width: 50, flexShrink: 0, background: t.card, border: `1px solid ${t.iBrd}`, color: t.mut, fontWeight: 600 }}>{((po.un || 0) * pw).toLocaleString("pt-BR")}</div>
+                  </div>
+                  {/* Divider */}
+                  <div style={{ width: 32, flexShrink: 0, display: "flex", justifyContent: "center" }}>
+                    <div style={{ width: 1, height: 32, background: t.brd }} />
+                  </div>
+                  {/* Right block - Balance */}
+                  <div style={{ display: "flex", alignItems: "center", gap: 16, padding: "6px 6px", background: t.cAlt, borderRadius: 8, flexShrink: 0 }}>
+                    {ship.ternos.map((tn, ti) => {
+                      const tUn = (po.perTerno && po.perTerno[tn.id]) || 0;
+                      return (
+                        <div key={tn.id} style={{ display: "flex", gap: 4, flexShrink: 0 }}>
+                          <input type="number" value={tUn || ""} onChange={e => { const s = JSON.parse(JSON.stringify(ship)); if (!s.poroes[i].perTerno) s.poroes[i].perTerno = {}; s.poroes[i].perTerno[tn.id] = parseInt(e.target.value) || 0; sv(s); }} placeholder="Un" style={{ ...S.inpS, width: 55, fontSize: 11, borderColor: tc(ti) }} />
+                          <div style={{ ...S.inpS, width: 50, fontSize: 11, background: t.card, border: `1px solid ${t.iBrd}`, color: t.mut, fontWeight: 600 }}>{(tUn * pw).toLocaleString("pt-BR")}</div>
+                        </div>
+                      );
+                    })}
+                    <button onClick={() => { const s = JSON.parse(JSON.stringify(ship)); s.poroes.splice(i, 1); sv(s); }} style={{ background: "none", border: "none", color: t.bad, cursor: "pointer", fontSize: 14, flexShrink: 0, width: 20 }}>×</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          {(!ship.poroes || !ship.poroes.length) && <div style={{ fontSize: 12, color: t.mut }}>Nenhum porão cadastrado.</div>}
+        </div>
+
+        <button style={{ ...S.btn(t.acc, "#FFF"), width: "100%", justifyContent: "center" }}
+          onClick={() => { sv(ship); setVw("active"); fl("Operação iniciada!"); }}>
+          ✓ Iniciar Operação
+        </button>
+      </div>
+    );
+  }
+
+  // ══════ ACTIVE ══════
+  function rActive() {
+    if (!ship) return null;
+    const c = calc(ship), pw = ship.pesoUn || 2;
+    return (
+      <div style={S.cnt}>
+        {/* Header */}
+        <div style={{ ...S.crd, borderTop: `4px solid ${t.acc}` }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+            <div>
+              <div style={{ fontSize: 18, fontWeight: 800 }}>🚢 {ship.navio || "—"}</div>
+              <div style={{ fontSize: 12, color: t.mut }}>Viagem {ship.viagem} · Berço {ship.berco || "—"} · {ship.produto} · {ship.ternos.length} terno(s)</div>
+            </div>
+            <button style={S.btnS(t.accL, t.acc)} onClick={() => setVw("new")}>✏️ Editar</button>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 8, marginTop: 12 }}>
+            <div style={{ background: t.accL, borderRadius: 8, padding: "8px 10px" }}>
+              <div style={{ fontSize: 9, fontWeight: 700, color: t.mut }}>PLANEJADO</div>
+              <div style={{ fontSize: 16, fontWeight: 800, color: t.acc }}>{c.plan.toLocaleString("pt-BR")} mt</div>
+            </div>
+            <div style={{ padding: "8px 10px" }}>
+              <div style={{ fontSize: 9, fontWeight: 700, color: t.mut }}>EMBARCADO</div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: t.ok }}>{c.eTon.toLocaleString("pt-BR")} mt</div>
+            </div>
+            <div style={{ padding: "8px 10px" }}>
+              <div style={{ fontSize: 9, fontWeight: 700, color: t.mut }}>SALDO</div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: c.saldo > 0 ? t.warn : t.ok }}>{c.sTon.toLocaleString("pt-BR")} mt</div>
+            </div>
+            <div style={{ padding: "8px 10px" }}>
+              <div style={{ fontSize: 9, fontWeight: 700, color: t.mut }}>PROD.LÍQUIDA</div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: t.acc }}>{c.pLiq.toFixed(1)} mt/h</div>
+            </div>
+          </div>
+          {c.etc && <div style={{ marginTop: 6, fontSize: 11, color: t.mut, background: t.accL, borderRadius: 6, padding: "4px 10px", display: "inline-block" }}>🕐 <strong style={{ color: t.tx }}>ETC:</strong> {c.etc.toLocaleDateString("pt-BR")} {c.etc.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</div>}
+        </div>
+
+        {/* Resumo */}
+        <div style={S.crd}>
+          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>📊 Resumo Geral</div>
+          <div style={S.g3}>
+            <div style={{ textAlign: "center", padding: 10 }}><div style={S.stV}>{c.eTon.toLocaleString("pt-BR")}</div><div style={S.stL}>Embarcado (mt)</div></div>
+            <div style={{ textAlign: "center", padding: 10 }}><div style={{ ...S.stV, color: c.saldo > 0 ? t.warn : t.ok }}>{c.sTon.toLocaleString("pt-BR")}</div><div style={S.stL}>Saldo (mt)</div></div>
+            <div style={{ textAlign: "center", padding: 10 }}><div style={S.stV}>{c.ca}</div><div style={S.stL}>Autos (ca)</div></div>
+          </div>
+          <div style={S.pBar}><div style={S.pFill(c.pct)} /></div>
+          <div style={{ display: "flex", justifyContent: "space-between", marginTop: 6, fontSize: 11 }}>
+            <span style={{ color: t.mut }}>{c.pct.toFixed(1)}%</span>
+            <span style={{ color: t.mut }}>Mov/h: <strong style={{ color: t.acc }}>{c.mH.toFixed(1)}</strong></span>
+          </div>
+          <div style={{ marginTop: 14, paddingTop: 10, borderTop: `1px solid ${t.brd}` }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: t.mut, marginBottom: 6 }}>POR TERNO</div>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              {ship.ternos.map((tn, i) => {
+                const tt = tTot(ship, tn.id);
+                return (
+                  <div key={tn.id} style={{ flex: 1, minWidth: 85, background: t.cAlt, borderRadius: 8, padding: "8px 10px", borderTop: `3px solid ${tc(i)}` }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: t.mut }}>{tn.nome}</div>
+                    <div style={{ fontSize: 15, fontWeight: 800 }}>{tt.ton.toLocaleString("pt-BR")} mt</div>
+                    <div style={{ fontSize: 9, color: t.mut }}>{tt.a} ca</div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* Charts */}
+        <div style={{ display: "flex", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
+          <button style={{ ...S.btnS(t.accL, t.acc) }} onClick={() => setShowChart(!showChart)}>
+            {showChart ? "▲ Fechar" : "📊 Performance por Porão"}
+          </button>
+          <button style={{ ...S.btnS(t.accL, t.acc) }} onClick={() => setShowBalance(!showBalance)}>
+            {showBalance ? "▲ Fechar" : "⚖️ Balance"}
+          </button>
+        </div>
+        {showChart && rChart()}
+        {showBalance && rBalance()}
+
+        {/* Periodos */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", margin: "14px 0 8px" }}>
+          <div style={{ fontSize: 14, fontWeight: 700 }}>📅 Períodos</div>
+        </div>
+
+        {!ship.periodos.length && <div style={{ ...S.crd, textAlign: "center", color: t.mut, padding: 30 }}>Clique em "+ Período"</div>}
+
+        {ship.periodos.map((per, pi) => {
+          const isCollapsed = collPers[pi];
+          const perTotUn = (() => { let u = 0; per.linhas.forEach(l => { l.td.forEach(x => { u += (x.un || 0); if (x.extra) x.extra.forEach(e => u += (e ? e.un || 0 : 0)); }); }); return u; })();
+          const perTotTon = perTotUn * pw;
+          return (
+          <div key={per.id} style={{ ...S.crd, padding: 0, overflow: "hidden" }}>
+            {/* Period header */}
+            <div style={{ background: t.accL, padding: "10px 14px", display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexWrap: "wrap", gap: 8 }}>
+              <div style={{ display: "flex", gap: 8, alignItems: "flex-end", flexWrap: "wrap" }}>
+                <button onClick={() => setCollPers({ ...collPers, [pi]: !isCollapsed })} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 14, padding: "0 4px 2px 0", color: t.acc, marginBottom: 1 }}>{isCollapsed ? "▶" : "▼"}</button>
+                <div><label style={{ fontSize: 9, fontWeight: 700, color: t.mut }}>DATA</label><input type="date" value={per.data} onChange={e => { const s = JSON.parse(JSON.stringify(ship)); s.periodos[pi].data = e.target.value; s.periodos[pi].equipe = getEquipe(e.target.value, s.periodos[pi].periodo); sv(s); }} style={{ ...S.inpS, width: 125, display: "block" }} /></div>
+                <div><label style={{ fontSize: 9, fontWeight: 700, color: t.mut }}>PERÍODO</label><select value={per.periodo} onChange={e => { const s = JSON.parse(JSON.stringify(ship)); s.periodos[pi].periodo = e.target.value; s.periodos[pi].linhas = mkLinhas(e.target.value, ship.ternos); s.periodos[pi].equipe = getEquipe(s.periodos[pi].data, e.target.value); sv(s); }} style={{ ...S.inpS, width: 78, display: "block" }}>{PERIODOS.map(p => <option key={p}>{p}</option>)}</select></div>
+                <div><label style={{ fontSize: 9, fontWeight: 700, color: t.mut }}>EQUIPE</label><select value={per.equipe} onChange={e => { const s = JSON.parse(JSON.stringify(ship)); s.periodos[pi].equipe = e.target.value; sv(s); }} style={{ ...S.inpS, width: 50, display: "block" }}>{EQUIPES.map(eq => <option key={eq} value={eq}>{eq}</option>)}</select></div>
+                <button style={{ ...S.btnS(t.acc, "#FFF"), marginBottom: 1 }} onClick={() => openGm(pi)}>👷</button>
+                {isCollapsed && perTotUn > 0 && (
+                  <span style={{ fontSize: 12, fontWeight: 700, color: t.acc, marginBottom: 2 }}>{perTotUn.toLocaleString("pt-BR")} un / {perTotTon.toLocaleString("pt-BR")} mt</span>
+                )}
+              </div>
+              {confirmDel === pi ? (
+                <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                  <button onClick={() => { sv({ ...ship, periodos: ship.periodos.filter((_, i) => i !== pi) }); setConfirmDel(null); fl("Período removido"); }} style={{ ...S.btnS(t.bad, "#FFF"), fontSize: 10 }}>Confirmar</button>
+                  <button onClick={() => setConfirmDel(null)} style={{ ...S.btnS(t.card, t.mut), fontSize: 10, border: `1px solid ${t.brd}` }}>Cancelar</button>
+                </div>
+              ) : (
+                <button onClick={() => setConfirmDel(pi)} style={{ background: "none", border: "none", color: t.bad, cursor: "pointer", fontSize: 14, padding: "4px" }}>🗑</button>
+              )}
+            </div>
+
+            {!isCollapsed && (
+            <div>
+            {/* Guincheiros badge */}
+            {per.guincheiros && Object.values(per.guincheiros).some(v => v) && (
+              <div style={{ padding: "4px 14px", background: t.cAlt, fontSize: 10, color: t.mut }}>
+                👷 {ship.ternos.map(tn => per.guincheiros[tn.id] ? tn.nome + ": " + per.guincheiros[tn.id] : "").filter(Boolean).join(" | ")}
+              </div>
+            )}
+
+            {/* Table */}
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11, tableLayout: "fixed" }}>
+                <colgroup>
+                  <col style={{ width: 56 }} />
+                  {ship.ternos.map(tn => [
+                    <col key={tn.id + "p"} style={{ width: 50 }} />,
+                    <col key={tn.id + "u"} style={{ width: 58 }} />,
+                    <col key={tn.id + "t"} style={{ width: 50 }} />,
+                    <col key={tn.id + "c"} style={{ width: 50 }} />,
+                  ]).flat()}
+                  <col style={{ width: 85 }} />
+                  <col style={{ width: 28 }} />
+                </colgroup>
+                <thead>
+                  <tr>
+                    <th rowSpan={2} style={{ padding: 4, textAlign: "center", borderBottom: `2px solid ${t.brd}`, fontSize: 10, color: t.mut, fontWeight: 700 }}>HORA</th>
+                    {ship.ternos.map((tn, ti) => (
+                      <th key={tn.id} colSpan={4} style={{ padding: 4, textAlign: "center", borderBottom: `1px solid ${t.brd}`, fontSize: 10, fontWeight: 700, color: tc(ti), borderLeft: `1px solid ${t.brd}` }}>{tn.nome}</th>
+                    ))}
+                    <th rowSpan={2} style={{ padding: 4, textAlign: "center", borderBottom: `2px solid ${t.brd}`, fontSize: 10, fontWeight: 700, color: t.acc, borderLeft: `2px solid ${t.brd}` }}>TOTAL<br /><span style={{ fontSize: 8, color: t.mut }}>Un/Mt</span></th>
+                    <th rowSpan={2} style={{ padding: 4, textAlign: "center", borderBottom: `2px solid ${t.brd}`, fontSize: 9, color: t.mut }}>⚠️</th>
+                  </tr>
+                  <tr>
+                    {ship.ternos.map(tn => [
+                      <th key={tn.id + "ph"} style={{ padding: 2, fontSize: 8, color: t.mut, borderBottom: `2px solid ${t.brd}`, textAlign: "center", borderLeft: `1px solid ${t.brd}` }}>Porão</th>,
+                      <th key={tn.id + "uh"} style={{ padding: 2, fontSize: 8, color: t.mut, borderBottom: `2px solid ${t.brd}`, textAlign: "center" }}>Un</th>,
+                      <th key={tn.id + "th"} style={{ padding: 2, fontSize: 8, color: t.mut, borderBottom: `2px solid ${t.brd}`, textAlign: "center" }}>Tons</th>,
+                      <th key={tn.id + "ch"} style={{ padding: 2, fontSize: 8, color: t.mut, borderBottom: `2px solid ${t.brd}`, textAlign: "center" }}>Ca</th>,
+                    ]).flat()}
+                  </tr>
+                </thead>
+                <tbody>
+                  {per.linhas.map((ln, li) => {
+                    const ht = hTot(ln, pw);
+                    const bg = li % 2 ? t.cAlt : "transparent";
+                    // Find which ternos have paralisações for this line
+                    const parsForTerno = (tIdx) => ln.pars ? ln.pars.filter(p => p.terno === ship.ternos[tIdx]?.nome) : [];
+                    const parsGeral = ln.pars ? ln.pars.filter(p => p.terno === "Geral") : [];
+                    const hasPars = ln.pars && ln.pars.length > 0;
+                    return [
+                      <tr key={ln.id} style={{ background: bg }}>
+                        <td style={{ padding: "6px 2px", textAlign: "center", fontWeight: 700, fontSize: 11, color: t.mut, borderRight: `1px solid ${t.brd}`, verticalAlign: "top" }}>
+                          {ln.h1}x{ln.h2}
+                        </td>
+                        {ship.ternos.map((tn, ti) => {
+                          const td = ln.td[ti];
+                          const tons = (td?.un || 0) * pw;
+                          const extras = td?.extra || [];
+                          const canAdd = extras.length < 2;
+                          const cellS = { padding: "2px 1px", verticalAlign: "top" };
+                          const iS = { ...S.inpS, width: "100%", padding: "4px 2px", fontSize: 13, fontWeight: 600 };
+                          const selS = { width: "100%", fontSize: 13, fontWeight: 600, padding: "4px 2px", background: t.iBg, border: `1px solid ${t.iBrd}`, borderRadius: 6, color: t.tx, boxSizing: "border-box", outline: "none" };
+                          const tonsS = { ...S.inpS, width: "100%", padding: "4px 2px", fontSize: 13, fontWeight: 600, color: t.mut, background: t.cAlt, border: `1px solid ${t.iBrd}` };
+                          return [
+                            <td key={ln.id + tn.id + "p"} style={{ ...cellS, borderLeft: `1px solid ${t.brd}` }}>
+                              <select value={td?.porId || ""} onChange={e => updCell(pi, li, ti, "porId", e.target.value)} style={selS}>
+                                <option value="">—</option>
+                                {ship.poroes.map(po => <option key={po.id} value={po.id}>{po.nome.replace("Porão #", "#")}</option>)}
+                              </select>
+                              {extras.map((ex, ei) => (
+                                <div key={ei} style={{ marginTop: 3, display: "flex", alignItems: "center", gap: 1 }}>
+                                  <select value={ex.porId || ""} onChange={e => updExtra(pi, li, ti, ei, "porId", e.target.value)} style={{ ...selS, fontSize: 11 }}>
+                                    <option value="">—</option>
+                                    {ship.poroes.map(po => <option key={po.id} value={po.id}>{po.nome.replace("Porão #", "#")}</option>)}
+                                  </select>
+                                  <button onClick={() => rmExtra(pi, li, ti, ei)} style={{ background: "none", border: "none", color: t.bad, cursor: "pointer", fontSize: 10, padding: 0, flexShrink: 0 }}>×</button>
+                                </div>
+                              ))}
+                            </td>,
+                            <td key={ln.id + tn.id + "u"} style={cellS}>
+                              <input type="number" value={td?.un || ""} onChange={e => updCell(pi, li, ti, "un", e.target.value)} placeholder="0" style={iS} />
+                              {extras.map((ex, ei) => (
+                                <div key={ei} style={{ marginTop: 3 }}>
+                                  <input type="number" value={ex.un || ""} onChange={e => updExtra(pi, li, ti, ei, "un", e.target.value)} placeholder="0" style={{ ...iS, fontSize: 11 }} />
+                                </div>
+                              ))}
+                            </td>,
+                            <td key={ln.id + tn.id + "t"} style={cellS}>
+                              <div style={tonsS}>{tons || 0}</div>
+                              {extras.map((ex, ei) => (
+                                <div key={ei} style={{ marginTop: 3 }}>
+                                  <div style={{ ...tonsS, fontSize: 11 }}>{(ex.un || 0) * pw || 0}</div>
+                                </div>
+                              ))}
+                            </td>,
+                            <td key={ln.id + tn.id + "c"} style={cellS}>
+                              <div style={{ display: "flex", alignItems: "center", gap: 1 }}>
+                                <input type="number" value={td?.ca || ""} onChange={e => updCell(pi, li, ti, "ca", e.target.value)} placeholder="0" style={iS} />
+                                {canAdd && <button onClick={() => addExtra(pi, li, ti)} style={{ background: "none", border: `1px solid ${t.iBrd}`, borderRadius: 4, cursor: "pointer", fontSize: 11, color: t.acc, padding: "2px 4px", flexShrink: 0, fontWeight: 700 }}>+</button>}
+                              </div>
+                              {extras.map((ex, ei) => (
+                                <div key={ei} style={{ marginTop: 3 }}>
+                                  <input type="number" value={ex.ca || ""} onChange={e => updExtra(pi, li, ti, ei, "ca", e.target.value)} placeholder="0" style={{ ...iS, fontSize: 11 }} />
+                                </div>
+                              ))}
+                            </td>,
+                          ];
+                        }).flat()}
+                        <td style={{ padding: "6px 2px", textAlign: "center", fontWeight: 700, fontSize: 12, color: ht.u > 0 ? t.ok : t.mut, borderLeft: `2px solid ${t.brd}`, verticalAlign: "top" }}>
+                          {ht.u > 0 ? `${ht.u} / ${ht.ton}` : "—"}
+                        </td>
+                        <td style={{ padding: "2px", textAlign: "center", verticalAlign: "top" }}>
+                          <button onClick={() => openDm(pi, li)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 12, opacity: .7, padding: "4px 0" }}>＋</button>
+                        </td>
+                      </tr>,
+                      hasPars && (
+                        <tr key={ln.id + "pars"} style={{ background: bg }}>
+                          <td style={{ borderRight: `1px solid ${t.brd}` }} />
+                          {ship.ternos.map((tn, ti) => {
+                            const tp = parsForTerno(ti);
+                            const gp = ti === 0 ? parsGeral : [];
+                            const all = [...gp, ...tp];
+                            return (
+                              <td key={ln.id + tn.id + "pars"} colSpan={4} style={{ padding: "1px 3px 4px", verticalAlign: "top", borderLeft: `1px solid ${t.brd}` }}>
+                                {all.map(par => (
+                                  <span key={par.id} style={{ display: "inline-flex", alignItems: "center", gap: 2, background: t.warn + "22", color: t.warn, fontSize: 8, fontWeight: 600, padding: "1px 4px", borderRadius: 3, marginRight: 2, marginBottom: 1 }}>
+                                    {par.cod}:{par.min}min
+                                    <button onClick={() => rmPar(pi, li, par.id)} style={{ background: "none", border: "none", color: t.bad, cursor: "pointer", fontSize: 9, padding: 0 }}>×</button>
+                                  </span>
+                                ))}
+                              </td>
+                            );
+                          })}
+                          <td style={{ borderLeft: `2px solid ${t.brd}` }} />
+                          <td />
+                        </tr>
+                      ),
+                    ];
+                  }).flat().filter(Boolean)}
+                  {/* Totals row */}
+                  <tr style={{ background: t.accL, borderTop: `2px solid ${t.acc}` }}>
+                    <td style={{ padding: "8px 2px", textAlign: "center", fontWeight: 800, fontSize: 13, color: t.acc }}>TOTAL</td>
+                    {ship.ternos.map(tn => {
+                      const pt = pTot(per, tn.id, pw);
+                      return [
+                        <td key={"pt" + tn.id + "p"} style={{ borderLeft: `1px solid ${t.brd}` }} />,
+                        <td key={"pt" + tn.id + "u"} style={{ padding: "8px 2px", textAlign: "center", fontWeight: 800, fontSize: 13 }}>{pt.u || "—"}</td>,
+                        <td key={"pt" + tn.id + "t"} style={{ padding: "8px 2px", textAlign: "center", fontWeight: 800, fontSize: 13, color: t.mut }}>{pt.ton || "—"}</td>,
+                        <td key={"pt" + tn.id + "c"} style={{ padding: "8px 2px", textAlign: "center", fontWeight: 800, fontSize: 13, color: t.mut }}>{pt.a || "—"}</td>,
+                      ];
+                    }).flat()}
+                    <td style={{ padding: "8px 2px", textAlign: "center", fontWeight: 800, fontSize: 13, color: t.acc, borderLeft: `2px solid ${t.brd}` }}>
+                      {(() => { let u = 0; per.linhas.forEach(l => { l.td.forEach(x => { u += (x.un || 0); if (x.extra) x.extra.forEach(e => u += (e.un || 0)); }); }); return u > 0 ? `${u} / ${u * pw}` : "—"; })()}
+                    </td>
+                    <td />
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            </div>
+            )}
+          </div>
+          );
+        })}
+
+        {/* Buttons */}
+        <div style={{ display: "flex", gap: 8, marginTop: 14, flexWrap: "wrap" }}>
+          <button style={S.btn(t.ok, "#FFF")} onClick={() => {
+            const tx = genTx(ship);
+            try { navigator.clipboard.writeText(tx).then(() => fl("📋 Texto copiado! Cole no WhatsApp")).catch(() => setCopyText(tx)); }
+            catch { setCopyText(tx); }
+          }}>📤 Compartilhar</button>
+          <button style={S.btn(t.acc, "#FFF")} onClick={addPer}>＋ Período</button>
+          <button style={{ ...S.btn(t.card, t.acc), border: `2px solid ${t.acc}` }} onClick={genClient}>📋 Relatório Cliente</button>
+          {confirmFin ? (
+            <div style={{ display: "flex", gap: 6, alignItems: "center", marginLeft: "auto" }}>
+              <span style={{ fontSize: 11, color: t.bad, fontWeight: 600 }}>Tem certeza?</span>
+              <button style={S.btn(t.bad, "#FFF")} onClick={() => { setConfirmFin(false); finalizar(); }}>Sim, finalizar</button>
+              <button style={{ ...S.btn(t.card, t.tx), border: `1px solid ${t.brd}` }} onClick={() => setConfirmFin(false)}>Cancelar</button>
+            </div>
+          ) : (
+            <button style={{ ...S.btn(t.bad, "#FFF"), marginLeft: "auto" }} onClick={() => setConfirmFin(true)}>✓ Finalizar</button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // ══════ CHART ══════
+  function rChart() {
+    if (!ship || !ship.poroes || !ship.poroes.length) return <div style={{ ...S.crd, textAlign: "center", color: t.mut, fontSize: 12 }}>Cadastre porões para ver o gráfico.</div>;
+    const data = porPerf(ship);
+    const maxM = Math.max(...data.map(d => d.mH), 1);
+    const maxT = Math.max(...data.map(d => d.tH), 1);
+    return (
+      <div style={S.crd}>
+        <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 12 }}>📊 Performance por Porão</div>
+        <div style={{ fontSize: 10, fontWeight: 700, color: t.mut, marginBottom: 6 }}>MOV/HORA (un/h)</div>
+        <div style={{ display: "flex", alignItems: "flex-end", gap: 6, height: 100, marginBottom: 16 }}>
+          {data.map(d => (
+            <div key={d.id} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", height: "100%", justifyContent: "flex-end" }}>
+              <div style={{ fontSize: 9, fontWeight: 700, color: t.acc, marginBottom: 2 }}>{d.mH.toFixed(1)}</div>
+              <div style={{ width: "100%", maxWidth: 36, background: `linear-gradient(180deg,${t.t1},${t.acc})`, borderRadius: "4px 4px 0 0", height: `${Math.max((d.mH / maxM) * 80, 4)}%` }} />
+              <div style={{ fontSize: 8, color: t.mut, marginTop: 3, fontWeight: 600 }}>{d.nome.replace("Porão ", "#")}</div>
+            </div>
+          ))}
+        </div>
+        <div style={{ fontSize: 10, fontWeight: 700, color: t.mut, marginBottom: 6 }}>TON/HORA (mt/h)</div>
+        <div style={{ display: "flex", alignItems: "flex-end", gap: 6, height: 100 }}>
+          {data.map(d => (
+            <div key={d.id + "t"} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", height: "100%", justifyContent: "flex-end" }}>
+              <div style={{ fontSize: 9, fontWeight: 700, color: t.ok, marginBottom: 2 }}>{d.tH.toFixed(1)}</div>
+              <div style={{ width: "100%", maxWidth: 36, background: `linear-gradient(180deg,${t.t2},${t.ok})`, borderRadius: "4px 4px 0 0", height: `${Math.max((d.tH / maxT) * 80, 4)}%` }} />
+              <div style={{ fontSize: 8, color: t.mut, marginTop: 3, fontWeight: 600 }}>{d.nome.replace("Porão ", "#")}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // ══════ BALANCE ══════
+  function rBalance() {
+    if (!ship) return null;
+    const pw = ship.pesoUn || 2;
+    // Calc planned per terno (sum of perTerno across all porões)
+    const ternoPlan = {};
+    ship.ternos.forEach(tn => {
+      let plan = 0;
+      (ship.poroes || []).forEach(po => {
+        plan += (po.perTerno && po.perTerno[tn.id]) || 0;
+      });
+      ternoPlan[tn.id] = plan * pw; // in tons
+    });
+    // Calc realized per terno
+    const ternoReal = {};
+    ship.ternos.forEach(tn => {
+      const tt = tTot(ship, tn.id);
+      ternoReal[tn.id] = tt.ton;
+    });
+    // Find max for chart scaling
+    const allVals = [...Object.values(ternoPlan), ...Object.values(ternoReal)];
+    const maxVal = Math.max(...allVals, 1);
+    // Calc difference between ternos
+    const saldos = ship.ternos.map(tn => ternoPlan[tn.id] - ternoReal[tn.id]);
+    const maxSaldo = Math.max(...saldos);
+    const minSaldo = Math.min(...saldos);
+    const diff = maxSaldo - minSaldo;
+
+    return (
+      <div style={S.crd}>
+        <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 14 }}>⚖️ Balance — Equilíbrio entre Ternos</div>
+        {/* Bars per terno */}
+        <div style={{ display: "flex", gap: 16, justifyContent: "center", marginBottom: 16 }}>
+          {ship.ternos.map((tn, ti) => {
+            const plan = ternoPlan[tn.id] || 0;
+            const real = ternoReal[tn.id] || 0;
+            const saldo = plan - real;
+            const pctDone = plan > 0 ? (real / plan) * 100 : 0;
+            const planH = maxVal > 0 ? Math.min((plan / maxVal) * 140, 130) : 0;
+            const realH = maxVal > 0 ? Math.min((real / maxVal) * 140, 130) : 0;
+            return (
+              <div key={tn.id} style={{ flex: 1, maxWidth: 160, textAlign: "center" }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: tc(ti), marginBottom: 16 }}>{tn.nome}</div>
+                {/* Bar chart */}
+                <div style={{ display: "flex", gap: 6, justifyContent: "center", alignItems: "flex-end", height: 170 }}>
+                  {/* Planned bar */}
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+                    <div style={{ fontSize: 9, fontWeight: 600, color: t.mut, marginBottom: 2 }}>{plan.toLocaleString("pt-BR")}</div>
+                    <div style={{ width: 28, height: planH, background: t.brd, borderRadius: "4px 4px 0 0", transition: "height .5s" }} />
+                    <div style={{ fontSize: 8, color: t.mut, marginTop: 3 }}>Plan.</div>
+                  </div>
+                  {/* Realized bar */}
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+                    <div style={{ fontSize: 9, fontWeight: 700, color: tc(ti), marginBottom: 2 }}>{real.toLocaleString("pt-BR")}</div>
+                    <div style={{ width: 28, height: realH, background: tc(ti), borderRadius: "4px 4px 0 0", transition: "height .5s" }} />
+                    <div style={{ fontSize: 8, color: t.mut, marginTop: 3 }}>Real.</div>
+                  </div>
+                </div>
+                {/* Stats below */}
+                <div style={{ marginTop: 8, padding: "6px 8px", background: t.cAlt, borderRadius: 6 }}>
+                  <div style={{ fontSize: 10, color: t.mut }}>Saldo: <strong style={{ color: saldo > 0 ? t.warn : t.ok }}>{saldo.toLocaleString("pt-BR")} mt</strong></div>
+                  <div style={{ fontSize: 10, color: t.mut }}>{pctDone.toFixed(1)}% concluído</div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        {/* Difference indicator */}
+        {ship.ternos.length > 1 && diff > 0 && (
+          <div style={{ textAlign: "center", padding: "8px 12px", borderRadius: 8, background: diff > (maxVal * 0.1) ? t.warn + "22" : t.ok + "22", fontSize: 11 }}>
+            <span style={{ fontWeight: 700, color: diff > (maxVal * 0.1) ? t.warn : t.ok }}>
+              {diff > (maxVal * 0.1) ? "⚠️" : "✅"} Diferença entre ternos: {diff.toLocaleString("pt-BR")} mt
+            </span>
+            {diff > (maxVal * 0.1) && <div style={{ fontSize: 10, color: t.mut, marginTop: 2 }}>Considerar remanejamento de carga</div>}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // ══════ HISTORY ══════
+  function rHist() {
+    return (
+      <div style={S.cnt}>
+        <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 12 }}>📁 Histórico</div>
+        {!hist.length && <div style={{ ...S.crd, textAlign: "center", color: t.mut }}>Vazio.</div>}
+        {hist.map((h, i) => (
+          <div key={h.id || i} style={{ ...S.crd, cursor: "pointer" }} onClick={() => { setHDet(h); setVw("hdet"); }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div><div style={{ fontWeight: 700 }}>🚢 {h.navio}</div><div style={{ fontSize: 11, color: t.mut }}>V.{h.viagem} · {new Date(h.createdAt).toLocaleDateString("pt-BR")}</div></div>
+              <span style={{ fontSize: 11, color: t.ok, fontWeight: 600 }}>{h.res?.pct?.toFixed(1) || 0}%</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  function rHDet() {
+    if (!hDet) return null;
+    const c = hDet.res || calc(hDet);
+    return (
+      <div style={S.cnt}>
+        <div style={S.crd}>
+          <div style={{ fontSize: 16, fontWeight: 800 }}>🚢 {hDet.navio}</div>
+          <div style={{ fontSize: 12, color: t.mut }}>V.{hDet.viagem} · {hDet.produto}</div>
+          <div style={{ ...S.g4, marginTop: 12 }}>
+            <div style={{ textAlign: "center" }}><div style={S.stV}>{(c.emb || 0).toLocaleString("pt-BR")}</div><div style={S.stL}>Embarcado</div></div>
+            <div style={{ textAlign: "center" }}><div style={S.stV}>{(c.eTon || 0).toLocaleString("pt-BR")}</div><div style={S.stL}>Toneladas</div></div>
+            <div style={{ textAlign: "center" }}><div style={S.stV}>{c.ca || 0}</div><div style={S.stL}>Autos</div></div>
+            <div style={{ textAlign: "center" }}><div style={{ ...S.stV, color: t.ok }}>{(c.mH || 0).toFixed(1)}</div><div style={S.stL}>Mov/h</div></div>
+          </div>
+        </div>
+        <button style={{ ...S.btn(t.acc, "#FFF"), width: "100%", justifyContent: "center" }}
+          onClick={() => { navigator.clipboard?.writeText(genTx(hDet)).then(() => fl("Copiado!")); }}>📋 Copiar</button>
+      </div>
+    );
+  }
+
+  // ══════ MODALS ══════
+  function rDmModal() {
+    if (!dm) return null;
+    return (
+      <div style={S.modal} onClick={() => setDm(null)}>
+        <div style={S.modalC} onClick={e => e.stopPropagation()}>
+          <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 14 }}>⚠️ Registrar Paralisação</div>
+          <label style={S.lbl}>Código</label>
+          <select value={dmC} onChange={e => { setDmC(e.target.value); setDmD(DELAYS.find(x => x.c === e.target.value)?.d || ""); }} style={{ ...S.sel, marginBottom: 8 }}>
+            {DELAYS.map(d => <option key={d.c} value={d.c}>{d.c}</option>)}
+          </select>
+          <label style={S.lbl}>Descrição (editável)</label>
+          <input value={dmD} onChange={e => setDmD(e.target.value)} style={{ ...S.inp, marginBottom: 8 }} />
+          <label style={S.lbl}>Terno</label>
+          <select value={dmT} onChange={e => setDmT(e.target.value)} style={{ ...S.sel, marginBottom: 8 }}>
+            <option value="Geral">Geral</option>
+            {ship?.ternos.map(tn => <option key={tn.id} value={tn.nome}>{tn.nome}</option>)}
+          </select>
+          <div style={S.g3}>
+            <div><label style={S.lbl}>Início</label><input type="time" value={dmI} onChange={e => setDmI(e.target.value)} onBlur={dmCalc} style={S.inp} /></div>
+            <div><label style={S.lbl}>Fim</label><input type="time" value={dmF} onChange={e => setDmF(e.target.value)} onBlur={dmCalc} style={S.inp} /></div>
+            <div><label style={S.lbl}>Total (min)</label><input type="number" value={dmM} onChange={e => setDmM(parseInt(e.target.value) || 0)} style={S.inp} /></div>
+          </div>
+          <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
+            <button style={S.btn(t.acc, "#FFF")} onClick={saveDm}>Salvar</button>
+            <button style={S.btn("transparent", t.mut)} onClick={() => setDm(null)}>Cancelar</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  function rGmModal() {
+    if (!gm || !ship) return null;
+    return (
+      <div style={S.modal} onClick={() => setGm(null)}>
+        <div style={S.modalC} onClick={e => e.stopPropagation()}>
+          <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 12 }}>👷 Guincheiros — Período {ship.periodos[gm.pi]?.periodo}</div>
+          {ship.ternos.map(tn => (
+            <div key={tn.id} style={{ marginBottom: 10 }}>
+              <label style={S.lbl}>{tn.nome}</label>
+              <input value={gv[tn.id] || ""} onChange={e => setGv({ ...gv, [tn.id]: e.target.value })} placeholder="Nome do guincheiro" style={S.inp} />
+            </div>
+          ))}
+          <button style={S.btn(t.acc, "#FFF")} onClick={saveGm}>Salvar</button>
+        </div>
+      </div>
+    );
+  }
+
+  function rCopyModal() {
+    if (!copyText) return null;
+    return (
+      <div style={S.modal} onClick={() => setCopyText(null)}>
+        <div style={S.modalC} onClick={e => e.stopPropagation()}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+            <div style={{ fontSize: 15, fontWeight: 700 }}>📋 Relatório Cliente</div>
+            <button onClick={() => setCopyText(null)} style={{ background: "none", border: "none", fontSize: 18, cursor: "pointer", color: t.mut }}>×</button>
+          </div>
+          <textarea
+            readOnly
+            value={copyText}
+            onFocus={e => e.target.select()}
+            style={{ width: "100%", minHeight: 200, padding: 12, borderRadius: 8, border: `1px solid ${t.iBrd}`, background: t.iBg, color: t.tx, fontSize: 12, fontFamily: "monospace", resize: "vertical", boxSizing: "border-box", outline: "none" }}
+          />
+          <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+            <button style={S.btn(t.acc, "#FFF")} onClick={() => {
+              try { navigator.clipboard.writeText(copyText).then(() => { fl("📋 Copiado!"); setCopyText(null); }).catch(() => fl("Selecione o texto e copie manualmente")); }
+              catch { fl("Selecione o texto e copie manualmente"); }
+            }}>📋 Copiar</button>
+            <button style={{ ...S.btn(t.card, t.tx), border: `1px solid ${t.brd}` }} onClick={() => setCopyText(null)}>Fechar</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ══════ MAIN ══════
+  if (load) return (
+    <div style={{ ...S.page, display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh" }}>
+      <div style={{ textAlign: "center" }}><div style={{ fontSize: 32 }}>🚢</div><div style={{ color: t.mut, marginTop: 8 }}>Carregando...</div></div>
+    </div>
+  );
+
+  return (
+    <div style={S.page}>
+      <div style={S.hdr}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 16, fontWeight: 700 }}>
+          {vw !== "home" && <button onClick={() => setVw(vw === "hdet" ? "history" : "home")} style={{ background: "none", border: "none", color: t.hTx, cursor: "pointer", fontSize: 18, padding: 0 }}>←</button>}
+          <svg width="28" height="28" viewBox="0 0 40 40" fill="none"><rect width="40" height="40" rx="8" fill="rgba(255,255,255,.15)" /><text x="8" y="24" fontFamily="Arial Black" fontSize="18" fontWeight="900" fill="#FFF">P</text><path d="M4 32Q12 28 20 32Q28 36 36 32" stroke={t.cy} strokeWidth="2" fill="none" opacity=".8" /><path d="M4 35Q12 31 20 35Q28 39 36 35" stroke={t.li} strokeWidth="1.5" fill="none" opacity=".6" /></svg>
+          <span>Ship ProdTracker</span>
+        </div>
+        <button onClick={togTm} style={{ background: "rgba(255,255,255,.15)", border: "none", borderRadius: 6, padding: "4px 10px", color: t.hTx, cursor: "pointer", fontSize: 14 }}>
+          {tm === "light" ? "🌙" : "☀️"}
+        </button>
+      </div>
+
+      {vw === "home" && rHome()}
+      {vw === "new" && rNew()}
+      {vw === "active" && rActive()}
+      {vw === "history" && rHist()}
+      {vw === "hdet" && rHDet()}
+
+      {rDmModal()}
+      {rGmModal()}
+      {rCopyModal()}
+
+      <div style={S.toastS(!!toast)}>{toast}</div>
+
+      <svg style={{ position: "fixed", bottom: 0, left: 0, right: 0, pointerEvents: "none", opacity: .12 }} viewBox="0 0 1200 60" preserveAspectRatio="none" height="35">
+        <path d="M0 30Q150 0 300 30Q450 60 600 30Q750 0 900 30Q1050 60 1200 30V60H0Z" fill={t.cy} />
+        <path d="M0 40Q150 15 300 40Q450 65 600 40Q750 15 900 40Q1050 65 1200 40V60H0Z" fill={t.li} opacity=".5" />
+      </svg>
+    </div>
+  );
+}
+
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>
